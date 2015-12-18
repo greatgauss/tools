@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
 
     if (0 == strcmp("-r", argv[1]) && 3 == argc) {
         addr.s_addr = inet_addr(argv[2]);
-        if (addr.s_addr == 0 || addr.s_addr == -1)
+        if (addr.s_addr == 0 || addr.s_addr == (unsigned int)(-1))
         {
             perror("inet_addr");
             return -1;
