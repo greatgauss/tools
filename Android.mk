@@ -8,3 +8,10 @@ LOCAL_MODULE = dns
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_EXECUTABLE)
 
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := text2byte.c
+
+LOCAL_C_INCLUDES := $(KERNEL_HEADERS)
+LOCAL_MODULE = text2byte
+LOCAL_MODULE_TAGS := optional
+include $(BUILD_EXECUTABLE)

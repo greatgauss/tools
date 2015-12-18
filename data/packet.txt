@@ -1,0 +1,35 @@
+e8 cc 18 5c e9 34 // Dst MAC
+00 0e a3 fe ff fd // Src MAC
+08 00 // IP is payload
+	//IP Header
+	45 00 
+	02 5b //Total Length
+	c9 98 //ID
+	40 00 //Fragment offset
+	40  //TTL 
+	06 // TCP is payload 
+	3f 5a //checksum
+	c0 a8 01 3f //Src IP
+	75 90 f8 32 //Dst IP
+	
+	//TCP Header
+	b5 20 //Source Port 
+	07 9b //Destination Port
+	08 26 1d 62 //Seq No.
+	d1 75 15 e7 //Ack No.
+	80 18
+	00 73 81 42 00 00 01 01 08 0a 00 11 d4 f8 94 3d 82 26
+
+//GET /000000000000
+47 45 54 20 2f 30 30 30 30 30 30 30 30 30
+30 30 30 
+
+// HTTP/1.0
+48 54 54 50 2f 31 2e 30 0d 0a
+//Host: 117.144.248.50:1947 
+48 6f 73 74 3a 20 31 31 37 2e 31 34 34 2e 32 34 38
+2e 35 30 3a 31 39 34 37 0d 0a
+
+//Accept: */*
+41 63 63 65 70 74
+3a 20 2a 2f 2a 0d 0a 0d 0a
