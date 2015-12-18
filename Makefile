@@ -11,7 +11,7 @@ text2byte: text2byte.c
 	gcc text2byte.c -o $(intermediate)/$@
 
 rawsend: rawsend.c
-	gcc rawsend.c -o $(intermediate)/$@
+	gcc rawsend.c lib/netutils.c -Iinclude -o $(intermediate)/$@
 
 install:
 	install -m 0755 $(intermediate)/dns  $(bindir)
