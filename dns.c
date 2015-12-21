@@ -25,7 +25,6 @@ int main(int argc, char *argv[])
 {
     struct in_addr addr;
     struct hostent *he;
-    int i;
 
     if (1 == argc) {
         usage();
