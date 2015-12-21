@@ -3,7 +3,7 @@ intermediate = ./intermediate
 bindir = $(prefix)/bin
 export bindir
 flags = -g -Wall
-all: dns text2byte rawsend rawrecv igmptools
+all: dns text2byte rawsend rawrecv igmptools vconfig
 dns: dns.c
 	gcc $(flags) dns.c -o $(intermediate)/$@
 
@@ -19,12 +19,16 @@ rawrecv: rawrecv.c
 igmptools: igmptools.c
 	gcc $(flags) igmptools.c lib/netutils.c -Iinclude -o $(intermediate)/$@
 
+vconfig: vconfig.c
+	gcc $(flags) vconfig.c -o $(intermediate)/$@
+
 install:
 	install -m 0755 $(intermediate)/dns  $(bindir)
 	install -m 0755 $(intermediate)/text2byte $(bindir)
 	install -m 0755 $(intermediate)/rawsend $(bindir)
 	install -m 0755 $(intermediate)/rawrecv $(bindir)
 	install -m 0755 $(intermediate)/igmptools $(bindir)
+	install -m 0755 $(intermediate)/vconfig $(bindir)
 
 clean:
 	rm -fr $(intermediate)/*
