@@ -31,3 +31,11 @@ LOCAL_C_INCLUDES := $(KERNEL_HEADERS) $(LOCAL_PATH)/include
 LOCAL_MODULE = rawrecv
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := igmptools.c lib/netutils.c
+
+LOCAL_C_INCLUDES := $(KERNEL_HEADERS) $(LOCAL_PATH)/include
+LOCAL_MODULE = igmptools
+LOCAL_MODULE_TAGS := optional
+include $(BUILD_EXECUTABLE)

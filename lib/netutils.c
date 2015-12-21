@@ -7,6 +7,7 @@
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -26,7 +27,16 @@
 
 
 #define NOT_UNICAST(e) ((e[0] & 0x01) != 0)
-#define GOTO(ret_val, lbl) do {ret = ret_val; goto lbl;} while(0)   
+
+#define GOTO(ret_val, lbl) do {ret = ret_val; goto lbl;} while(0)
+
+#define ERR_GOTO(expression, ret_val, lbl) \
+    do { \
+        if(expression) { \
+            ret = ret_val; \
+            goto lbl;\
+        }\
+    } while(0)
 
 
 int create_raw_socket
@@ -67,8 +77,7 @@ int create_raw_socket
     	memcpy(hwaddr, ifr.ifr_hwaddr.sa_data, ETH_ALEN);
 
     	if (NOT_UNICAST(hwaddr)) {
-    	    char buffer[256];
-    	    fprintf(stderr, "Interface %.16s has broadcast/multicast MAC address??", ifname);
+            fprintf(stderr, "Interface %.16s has broadcast/multicast MAC address??", ifname);
             GOTO(-1,exit_now);
     	}
     }
@@ -105,5 +114,87 @@ exit_now:
 }
 
 
+
+static int ifm_ctl_sock = -1;
+
+
+
+char *ifm_ipaddr(unsigned addr, char *addr_str)
+{
+    sprintf(addr_str,"%d.%d.%d.%d",
+            addr & 255,
+            ((addr >> 8) & 255),
+            ((addr >> 16) & 255),
+            (addr >> 24));
+    return addr_str;
+}
+
+
+int ifm_open_ctrl_sock(void)
+{
+    if (ifm_ctl_sock == -1) {
+        ifm_ctl_sock = socket(AF_INET, SOCK_DGRAM, 0);
+        if (ifm_ctl_sock < 0) {
+            fprintf(stderr, "open socket failed: %s\n", strerror(errno));
+        }
+    }
+    return ifm_ctl_sock < 0 ? -1 : 0;
+}
+
+void ifm_close_ctrl_sock(void)
+{
+    if (ifm_ctl_sock != -1) {
+        (void)close(ifm_ctl_sock);
+        ifm_ctl_sock = -1;
+    }
+}
+
+static void ifm_init_ifreq(const char *name, struct ifreq *ifr)
+{
+    memset(ifr, 0, sizeof(struct ifreq));
+    strncpy(ifr->ifr_name, name, IFNAMSIZ);
+    ifr->ifr_name[IFNAMSIZ - 1] = 0;
+}
+
+
+//ASSUME IPv4???
+int ifm_get_info
+(const char *name,
+in_addr_t *addr,
+in_addr_t *mask,
+unsigned *flags)
+{
+    struct ifreq ifr;
+
+    ifm_open_ctrl_sock();
+    ifm_init_ifreq(name, &ifr);
+
+    if (addr != NULL) {
+        if(ioctl(ifm_ctl_sock, SIOCGIFADDR, &ifr) < 0) {
+            *addr = 0;
+        } else {
+            *addr = ((struct sockaddr_in*) &ifr.ifr_addr)->sin_addr.s_addr;
+        }
+    }
+
+    if (mask != NULL) {
+        if(ioctl(ifm_ctl_sock, SIOCGIFNETMASK, &ifr) < 0) {
+            *mask = 0;
+        } else {
+            *mask = ((struct sockaddr_in*) &ifr.ifr_addr)->sin_addr.s_addr;
+        }
+    }
+
+    if (flags != NULL) {
+        if(ioctl(ifm_ctl_sock, SIOCGIFFLAGS, &ifr) < 0) {
+            *flags = 0;
+        } else {
+            *flags = ifr.ifr_flags;
+        }
+    }
+
+    ifm_close_ctrl_sock();
+    return 0;
+}
 
 
