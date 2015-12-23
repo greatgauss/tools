@@ -14,5 +14,10 @@ int ifm_get_info
 (const char *name, in_addr_t *addr, in_addr_t *mask, unsigned *flags);
 
 
+int netutils_is_match_ip_packet
+(unsigned char *packet, int pktsize,
+unsigned short proto, unsigned int sip, unsigned int dip,
+unsigned short sport, unsigned short dport);
+
 #endif
 

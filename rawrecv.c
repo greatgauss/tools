@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <sys/stat.h>
@@ -11,7 +12,10 @@
 
 #include "netutils.h"
 
-void wait_for_raw_data(int fd, int timeout)
+void wait_for_raw_data
+(int fd, int timeout,
+unsigned short proto, unsigned int sip, unsigned int dip,
+unsigned short sport, unsigned short dport)
 {
     fd_set readable;
     int r;
@@ -20,6 +24,7 @@ void wait_for_raw_data(int fd, int timeout)
     struct timeval now;
     unsigned char data_buf[4096];
     int len;
+    int counter = 0;
 
     if (gettimeofday(&expire_at, NULL) < 0) {
     	printf("failed to gettimeofday");
@@ -66,7 +71,18 @@ void wait_for_raw_data(int fd, int timeout)
 
     	/* Get the packet */
         len = recv(fd, data_buf, sizeof(data_buf), 0);
-    	printf("%s: received data with len=%d\n", __FUNCTION__, len);
+        if (len < 0) {
+            fprintf(stderr, "failed recv packet: %s\n", strerror(errno));
+            continue;
+        }
+
+        if (netutils_is_match_ip_packet(
+            data_buf, len,
+            proto, sip, dip, sport, dport)) {
+            counter++;
+            if ((counter % 200) == 0)
+                printf("%d recved\n", counter);
+        }
     } while (1);
 }
 
@@ -83,9 +99,15 @@ int main( int argc, char** argv)
 {
     int fd;
     int type = ETH_P_ALL;
+    unsigned short proto = 0;
+    unsigned int sip = 0, dip = 0;
+    unsigned short sport = 0, dport = 0;
+
 
     if (1 == argc) {
-        fprintf(stderr, "%s [interface_name] {ALL|ARP|RARP|IP|PPPOED|PPPOES}\n", argv[0]);        
+        fprintf(stderr, "%s <interface_name> {ALL|ARP|RARP|IP|PPPOED|PPPOES}\n", argv[0]);
+        fprintf(stderr, "%s <interface_name> IP <proto> <sip> <dip> <sport> <dport>\n", argv[0]);
+        fprintf(stderr, "proto: 1:ICMP, 6:TCP, 17: UDP\n");
         return -1;
     }
 
@@ -111,7 +133,24 @@ int main( int argc, char** argv)
 
     fd = create_raw_socket( argv[1], type, NULL);
     if (fd !=-1) {
-    	wait_for_raw_data(fd, 1000);
+        if (type == ETH_P_IP) {
+            if (argc > 3) {
+                proto = atoi(argv[3]);
+            }
+            if (argc > 4) {
+                sip = inet_addr(argv[4]);
+            }
+            if (argc > 5) {
+                dip = inet_addr(argv[5]);
+            }
+            if (argc > 6) {
+                sport = atoi(argv[6]);
+            }
+            if (argc > 7) {
+                dport = inet_addr(argv[7]);
+            }
+        }
+        wait_for_raw_data(fd, 1000, proto, sip, dip, sport, dport);
     }
 
     return 0;

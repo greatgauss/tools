@@ -15,6 +15,7 @@
 #include <linux/if_arp.h>
 #include <linux/sockios.h>
 #include <linux/route.h>
+#include <linux/ip.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -37,6 +38,66 @@
             goto lbl;\
         }\
     } while(0)
+
+
+static char dump_buf[8192];
+void netutils_dump_data(char *desc, unsigned char *data, int datasize)
+{
+	int i, j, line;
+
+	fprintf(stderr, "%s(%d bytes)\n", desc, datasize);
+
+	for (i = 0, j = 0, line = 0; i < datasize; ++i) {
+        j += sprintf(dump_buf + j, "%2.2X ", data[i]);
+		if (i % 16 == 15) {
+			fprintf(stderr, "%s\n", dump_buf);
+			line++;
+			j = 0;
+		}
+	}
+
+	if (line * 16 < datasize) {
+		fprintf(stderr, "%s\n", dump_buf);
+	}
+}
+
+int netutils_is_match_ip_packet
+(unsigned char *packet, int pktsize,
+unsigned short proto, unsigned int sip, unsigned int dip, unsigned short sport, unsigned short dport)
+{
+    struct iphdr *ip;
+	int hlen;
+    unsigned char *tcpudp;
+
+    packet += 14;  //skip ethernet header
+    ip = (struct iphdr *)packet;
+
+    if(ip->version != 4)
+        return 0;
+	hlen = ip->ihl << 2;
+
+    if (proto != 0 && ip->protocol != proto) {
+        return 0;
+    }
+
+    if (sip != 0 && ip->saddr != sip) {
+        return 0;
+    }
+
+    if (dip != 0 && ip->daddr != dip) {
+        return 0;
+    }
+
+    if (IPPROTO_UDP == ip->protocol || IPPROTO_TCP == ip->protocol) {
+        tcpudp = packet + hlen * 4;
+        if (sport != 0 && sport != ntohs(*(unsigned short*)tcpudp))
+            return 0;
+        if (dport != 0 && dport != ntohs(*(unsigned short*)(tcpudp+2)))
+            return 0;
+    }
+
+    return 1;
+}
 
 
 int create_raw_socket
