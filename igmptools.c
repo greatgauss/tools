@@ -134,6 +134,7 @@ int main(int argc, char *argv[])
     int i;
     int fd;
     char *p;
+    int timeout_in_seconds = 30;
     
     /* validate number of arguments */
     if (argc < 3) {
@@ -159,7 +160,9 @@ int main(int argc, char *argv[])
         }
         
         join_group(fd, p_group_addr, p_multi_if_addr);
-        usleep(30 * MICRO);
+        if (argc > 5)
+            timeout_in_seconds = atoi(argv[5]);
+        usleep(timeout_in_seconds * MICRO);
 
         close_mc_socket(fd);
         return 0;
