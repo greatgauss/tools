@@ -47,3 +47,21 @@ LOCAL_C_INCLUDES := $(KERNEL_HEADERS)
 LOCAL_MODULE = vconfig
 LOCAL_MODULE_TAGS := optional
 include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := msend.c
+
+LOCAL_C_INCLUDES := $(KERNEL_HEADERS)
+LOCAL_MODULE = msend
+LOCAL_MODULE_TAGS := optional
+include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := mrecv.c 
+
+LOCAL_C_INCLUDES := $(KERNEL_HEADERS)
+LOCAL_SHARED_LIBRARIES := libc libcutils libnetutils
+LOCAL_MODULE = mrecv 
+LOCAL_MODULE_TAGS := optional 
+include $(BUILD_EXECUTABLE)
+
