@@ -1,0 +1,4 @@
+#ignore obj and lib file
+*.[oa]
+intermediate
+bin
