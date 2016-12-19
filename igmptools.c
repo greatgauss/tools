@@ -6,6 +6,7 @@
 #include <stdlib.h>     /* for atoi() */
 #include <string.h>     /* for strlen() */
 #include <unistd.h>     /* for close() */
+#include <netdb.h>     /* for close() */
 #include <errno.h>
 
 #include "netutils.h"
@@ -21,7 +22,7 @@ int open_mc_socket(int bind_port)
     int ret;
     struct sockaddr_in bind_addr;
     
-    sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    sock_fd = socket(AF_INET6, SOCK_DGRAM, 0);
     if ( sock_fd < 0 ) {
         fprintf(stderr, "create socket failed: %s(%d)\n", strerror(errno),errno);
         return -1;
@@ -29,8 +30,8 @@ int open_mc_socket(int bind_port)
     
     ret = setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&val, sizeof(val));
 
-    memset(&bind_addr, 0, sizeof(struct sockaddr_in));
-    bind_addr.sin_family = AF_INET;
+    /*memset(&bind_addr, 0, sizeof(struct sockaddr_in));
+    bind_addr.sin_family = AF_INET6;
     bind_addr.sin_port = htons(bind_port);
     bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     ret = bind(sock_fd, (struct sockaddr *) &bind_addr, sizeof(bind_addr));
@@ -39,7 +40,7 @@ int open_mc_socket(int bind_port)
         close(sock_fd);
         return -1;
     }
-
+*/
     return sock_fd;
 }
 
@@ -52,7 +53,7 @@ int close_mc_socket(int sock_fd)
 
 //group_addr: group address to join
 //multi_if_addr: address of the interface from which the group is joined in
-int join_group(int fd, const char* group_addr, const char* multi_if_addr)
+int ipv4_join_group(int fd, const char* group_addr, const char* multi_if_addr)
 {
     struct ip_mreq   mreq;
     in_addr_t addr;
@@ -72,6 +73,31 @@ int join_group(int fd, const char* group_addr, const char* multi_if_addr)
     mreq.imr_interface.s_addr = addr;
 
     ret = setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq));
+    if (ret < 0){
+        fprintf(stderr, "failed to set ADD_MEMBERSHIP: %s(%d)\n", strerror(errno),errno);
+        return -1;
+    }
+
+    return 0;
+}
+
+
+
+//group_addr: group address to join
+//multi_if_addr: address of the interface from which the group is joined in
+int ipv6_join_group(int fd, struct addrinfo* p_mc_addr)
+{
+    struct ipv6_mreq   mreq;
+    int ret;
+
+    memset(&mreq, 0, sizeof(mreq));
+    memcpy(&mreq.ipv6mr_multiaddr,
+        &((struct sockaddr_in6*)(p_mc_addr->ai_addr))->sin6_addr,
+        sizeof(mreq.ipv6mr_multiaddr));
+    /* Accept multicast from any interface */
+    mreq.ipv6mr_interface = 0;
+
+    ret = setsockopt(fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq));
     if (ret < 0){
         fprintf(stderr, "failed to set ADD_MEMBERSHIP: %s(%d)\n", strerror(errno),errno);
         return -1;
@@ -135,6 +161,9 @@ int main(int argc, char *argv[])
     int fd;
     char *p;
     int timeout_in_seconds = 30;
+    struct addrinfo*  multicastAddr;            /* Multicast Address */
+    struct addrinfo*  localAddr;                /* Local address to bind to */
+    struct addrinfo   hints          = { 0 };   /* Hints for name lookup */
     
     /* validate number of arguments */
     if (argc < 3) {
@@ -153,13 +182,46 @@ int main(int argc, char *argv[])
         p_group_addr = argv[3];
         mc_port = atoi(argv[4]);
 
-        fd = open_mc_socket(mc_port);
-        if (fd < 0) {
-            fprintf(stderr, "failed to open multicast socket\n");
+        /* Resolve the multicast group address */
+        hints.ai_family = PF_UNSPEC;
+        hints.ai_flags  = AI_NUMERICHOST;
+        if ( getaddrinfo(p_group_addr, NULL, &hints, &multicastAddr) != 0 ) {
+            fprintf(stderr, "failed to getaddrinfo()\n");
             return -1;
         }
-        
-        join_group(fd, p_group_addr, p_multi_if_addr);
+
+        printf("Using %s\n", multicastAddr->ai_family == PF_INET6 ? "IPv6" : "IPv4");
+
+        /* Get a local address with the same family (IPv4 or IPv6) as our multicast group */
+        hints.ai_family   = multicastAddr->ai_family;
+        hints.ai_socktype = SOCK_DGRAM;
+        hints.ai_flags    = AI_PASSIVE; /* Return an address we can bind to */
+        if ( getaddrinfo(NULL, argv[4], &hints, &localAddr) != 0 ) {
+            fprintf(stderr, "failed to next getaddrinfo()\n");
+            return -1;
+        }
+
+        /* Create socket for receiving datagrams */
+        if ( (fd = socket(localAddr->ai_family, localAddr->ai_socktype, 0)) < 0 ) {
+            fprintf(stderr, "failed to create socket%s(%d)\n", strerror(errno),errno);
+            return -1;
+        }
+
+         /* Bind to the multicast port */
+        if ( bind(fd, localAddr->ai_addr, localAddr->ai_addrlen) != 0 ) {
+            fprintf(stderr, "failed to bind socket%s(%d)\n", strerror(errno),errno);
+            return -1;
+        }
+
+        if ( multicastAddr->ai_family  == PF_INET &&  
+            multicastAddr->ai_addrlen == sizeof(struct sockaddr_in) ) {
+            ipv4_join_group(fd, p_group_addr, p_multi_if_addr);
+        }
+        else if ( multicastAddr->ai_family  == PF_INET6 &&
+            multicastAddr->ai_addrlen == sizeof(struct sockaddr_in6) ) {
+            ipv6_join_group(fd, multicastAddr);
+        }
+
         if (argc > 5)
             timeout_in_seconds = atoi(argv[5]);
         usleep(timeout_in_seconds * MICRO);
@@ -197,7 +259,7 @@ int main(int argc, char *argv[])
             sprintf(group_addr_str, "%s.%d", tmp_str, i);
 
             fprintf(stderr, "ADD  : %s\n",group_addr_str);
-            join_group(fd, group_addr_str, p_multi_if_addr);
+            //join_group(fd, group_addr_str, p_multi_if_addr);
             usleep(1*MICRO);
 
             fprintf(stderr, "LEAVE: %s\n",group_addr_str);
@@ -209,6 +271,11 @@ int main(int argc, char *argv[])
         return 0;
 
     }
+    else {
+        usage(argv[0]);
+        return -1;
+    }
+
     return 0;
 }
 
