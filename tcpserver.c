@@ -19,6 +19,19 @@ static int nwritten = 0;
 static char sender_buf[DATA_BUF_SIZE];
 static char receiver_buf[DATA_BUF_SIZE];
 
+
+static void usage()
+{
+    printf("usage:\n");
+    printf("server port:" NEWLINE);
+    printf("\t %d: PING_PONG mode. It is default." NEWLINE, PING_PONG_PORT);
+    printf("\t %d: DATA_FROM_SERVER_TO_CLIENT mode" NEWLINE, DATA_FROM_SERVER_TO_CLIENT_PORT);
+    printf("tcpserver -h" NEWLINE);
+    printf("tcpserver -s [server_ip] -p [server_port] -l [datalen]" NEWLINE);
+
+    return;
+}
+
 int tcp_server_interact_in_ping_pong_mode
     (int sock_fd, int data_len)
 {
@@ -104,14 +117,13 @@ int tcp_server_interact_in_pure_sender_mode
     if (FD_ISSET(sock_fd, &wset)) {
 writeagain:
         ret = write(sock_fd, sender_buf, data_len);
-        printf("write %d bytes\n",ret);
 
         if (ret < 0) {
             if (errno == EINTR) {
                 printf("write failed with EINTR\n");
                 goto writeagain;
             } else {
-                perror("call to write!");
+                perror("write failed");
                 return -5;
             }
         }
@@ -126,6 +138,7 @@ int main(int argc, char *argv[])
     int listen_fd;
     int conn_fd;
     int address_size = sizeof(pin);
+    char server_ip[128] = "0.0.0.0";
     char str[INET_ADDRSTRLEN];
     int i;
     int ret;
@@ -135,21 +148,32 @@ int main(int argc, char *argv[])
     data_len = 26 * 4;
     port = PING_PONG_PORT;
 
-    if (argc >= 2) {
-        port = atoi(argv[1]);
-    }
-    if (argc >= 3) {
-        data_len = atoi(argv[2]);
+    for ( i = 1; i < argc; i++ ) {
+        if (0 == strcmp(argv[i], "-h")) {
+            usage();
+            return 0;
+        }
+        else if (0 == strcmp(argv[i], "-s") && (i+1 < argc)) {
+            strncpy(server_ip, argv[i+1], sizeof(server_ip) / sizeof(server_ip[0]));
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-p") && (i+1 < argc)) {
+            port = atoi(argv[i+1]);
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-l") && (i+1 < argc)) {
+            data_len = atoi(argv[i+1]);
+            i++;
+        }
+        else {
+            usage();
+            return -1;
+        }
     }
 
     for (i = 0; i < DATA_BUF_SIZE; i++) {
         sender_buf[i] = i % 26 + 'A';
     }
-
-    bzero(&sin, sizeof(sin));
-    sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = INADDR_ANY;
-    sin.sin_port = htons(port);
 
     printf("\nFIXME!!! If SIGCHLD not handled, the child will become a zombie after client exit\n");
     signal(SIGCHLD, SIG_IGN);
@@ -160,18 +184,24 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
+    bzero(&sin, sizeof(sin));
+    sin.sin_family = AF_INET;
+    //sin.sin_addr.s_addr = INADDR_ANY;
+    inet_pton(AF_INET, server_ip, &sin.sin_addr);
+    sin.sin_port = htons(port);
     ret = bind(listen_fd, (struct sockaddr *)&sin, sizeof(sin));
     if (ret < 0) {
         perror("call to bind");
         exit(1);
     }
+
     ret = listen(listen_fd, 20);
     if (ret < 0) {
         perror("call to listen");
         exit(1);
     }
     
-    printf("Accepting connections on port %d...\n", port);
+    printf("Accepting connections on %s:%d...\n", server_ip, port);
 
     while(1) {
         conn_fd = accept(listen_fd, (struct sockaddr *)&pin, (socklen_t*)&address_size);
@@ -200,6 +230,7 @@ int main(int argc, char *argv[])
                         break;
                 }
             }
+           
             
             printf("close the connection\n");
             close(conn_fd);

@@ -12,13 +12,15 @@
 
 #include "tcp.h"
 
-void usage()
+static void usage()
 {
     printf("usage:\n");
-    printf("server port %d for PING_PONG mode" NEWLINE, PING_PONG_PORT);
-    printf("server port %d for DATA_FROM_SERVER_TO_CLIENT mode" NEWLINE, DATA_FROM_SERVER_TO_CLIENT_PORT);
-    printf("tcpclient [server_ip] [count]" NEWLINE);
-    printf("tcpclient [server_ip:server_port][count]" NEWLINE);
+    printf("server port:" NEWLINE);
+    printf("\t %d: PING_PONG mode. It is default." NEWLINE, PING_PONG_PORT);
+    printf("\t %d: DATA_FROM_SERVER_TO_CLIENT mode" NEWLINE, DATA_FROM_SERVER_TO_CLIENT_PORT);
+    printf("tcpclient -h" NEWLINE);
+    printf("tcpclient -s [server_ip] -p [server_port] -c [count]" NEWLINE);
+
     return;
 }
 
@@ -130,31 +132,23 @@ int tcp_client_interact_in_ping_pong_mode
 int tcp_client_interact_in_pure_recevier_mode(int sock_fd)
 {
     int nread;
-    fd_set rset;
 
-    FD_ZERO(&rset);
-    FD_SET(sock_fd, &rset);
-    int res = select(sock_fd + 1, &rset,NULL, NULL, NULL);
-    if (res == 0) {
+    nread = read(sock_fd, receiver_buf, MAXLINE);
+    if (0 == nread) {
+        printf("the peer has closed the connection." NEWLINE);
         return -1;
     }
-    else if (res < 0) {
-        if (errno == EINTR) {
-            return -2;
+    else if( nread < 0) {
+        if (errno == EAGAIN) {
+            printf("nread returns with errno EAGAIN(%s)" NEWLINE, strerror(errno));
+            return 0;
         }
-        printf("select failed error %d (%s)" NEWLINE, errno, strerror(errno));
-        return -3;
-    }
 
-    if (FD_ISSET(sock_fd, &rset)) {
-        nread = read(sock_fd, receiver_buf, MAXLINE);
-        if (0 == nread) {
-            printf("the peer has closed the connection." NEWLINE);
-            return -1;
-        }
-        else
-            printf("read %d bytes: \n%s\n",nread, receiver_buf);
+        printf("read() returns with errno %d (%s) " NEWLINE, errno, strerror(errno));
+        return -2;
     }
+    else 
+        printf("read %d bytes: \n",nread);
 
     return 0;
 }
@@ -163,37 +157,42 @@ int main(int argc, char *argv[])
 {
     struct sockaddr_in pin;
     int sock_fd;
-    unsigned int i,count;
+    unsigned int i,count = 0xFFFFFFFF;
     int maxFd;
     int res;
     char server_ip[128];
-    char *colon;
-    int port = -1;
+    int port = PING_PONG_PORT;
 
     fd_set wset;
     FD_ZERO(&wset);
 
-    if (argc < 2) {
+
+    if (argc < 3) {
         usage();
         return -1;
     }
 
-    if (argc < 3) {
-        count = 0xFFFFFFFF;
-    }
-    else {
-        count = atoi(argv[2]);
-    }
-
-    strncpy(server_ip, argv[1], sizeof(server_ip) / sizeof(server_ip[0]));
-    colon = strchr(server_ip, ':');
-    if (colon != NULL) {
-        *colon = '\0';
-        port = atoi(colon + 1);
-    }
-
-    if (port == -1) {
-        port = PING_PONG_PORT;
+    for ( i = 1; i < argc; i++ ) {
+        if (0 == strcmp(argv[i], "-h")) {
+            usage();
+            return 0;
+        }
+        else if (0 == strcmp(argv[i], "-s") && (i+1 < argc)) {
+            strncpy(server_ip, argv[i+1], sizeof(server_ip) / sizeof(server_ip[0]));
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-p") && (i+1 < argc)) {
+            port = atoi(argv[i+1]);
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-c") && (i+1 < argc)) {
+            count = atoi(argv[i+1]);
+            i++;
+        }
+        else {
+            usage();
+            return -1;
+        }
     }
 
     printf("try to connect %s:%d" NEWLINE, server_ip, port);
@@ -203,7 +202,7 @@ int main(int argc, char *argv[])
     pin.sin_port = htons(port);
     
     sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    MakeSocketNonBlocking(sock_fd);
+    //MakeSocketNonBlocking(sock_fd);
 
     FD_SET(sock_fd, &wset);
     maxFd = sock_fd;
@@ -284,7 +283,6 @@ int main(int argc, char *argv[])
     }
 
     close(sock_fd);
-    
     return 0;
 }
 
