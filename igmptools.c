@@ -6,7 +6,7 @@
 #include <stdlib.h>     /* for atoi() */
 #include <string.h>     /* for strlen() */
 #include <unistd.h>     /* for close() */
-#include <netdb.h>     /* for close() */
+#include <netdb.h>
 #include <errno.h>
 
 #include "netutils.h"
@@ -142,9 +142,10 @@ static void usage( char * cmd)
 {
     fprintf(stderr, "Join into or leave from a multicast group.\n");
     fprintf(stderr, "usage:\n");
-    fprintf(stderr, "%s join <InterfaceName> <GroupIP> <port>\n",cmd);
-    fprintf(stderr, "%s leave <InterfaceName> <GroupIP> <port>\n",cmd);
-    fprintf(stderr, "%s joinleave <InterfaceName> <GroupIP> <port> <counter>\n",cmd);
+
+    fprintf(stderr, "%s join -h -i <InterfaceName>  -g <GroupIP> -p <port> -t <exit_in_seconds>\n",cmd);
+    fprintf(stderr, "%s leave -h -i <InterfaceName>  -g <GroupIP> -p <port>\n",cmd);
+    fprintf(stderr, "%s joinleave -h -i <InterfaceName>  -g <GroupIP> -p <port> -c <counter>\n",cmd);
     return;
 }
 
@@ -153,9 +154,10 @@ int main(int argc, char *argv[])
     char group_addr_str[32] = {0};   /* multicast IP address */
     char tmp_str[32] = {0};   /* multicast IP address */
     char if_addr_str[32] = {0};
-    char *p_group_addr;             /* multicast IP address */
+    char *p_group_addr = "224.1.2.3";   /* multicast IP address */
+    char *if_name = NULL;
     char *p_multi_if_addr;
-    unsigned short mc_port;       /* multicast port */
+    char * mc_port = "1234";       /* multicast port */
     unsigned short counter;
     int i;
     int fd;
@@ -165,23 +167,56 @@ int main(int argc, char *argv[])
     struct addrinfo*  localAddr;                /* Local address to bind to */
     struct addrinfo   hints          = { 0 };   /* Hints for name lookup */
     
-    /* validate number of arguments */
-    if (argc < 3) {
-        usage(argv[0]);
-        exit(1);
-    }
-
     struct in_addr addr;
     struct in_addr net;
 
-    ifm_get_info(argv[2], &addr.s_addr, &net.s_addr, NULL);
+    /* validate the arguments */
+    if (argc < 3 || 
+        (strcmp(argv[1], "join") && 
+        strcmp(argv[1], "leave") && 
+        strcmp(argv[1], "joinleave"))) {
+        usage(argv[0]);
+        exit(1);
+
+    }
+
+    for ( i = 2; i < argc; i++ ) {
+        if (0 == strcmp(argv[i], "-h")) {
+            usage(argv[0]);
+            return 0;
+        }
+        else if (0 == strcmp(argv[i], "-i") && (i+1 < argc)) {
+            if_name = argv[i+1];
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-p") && (i+1 < argc)) {
+            mc_port = argv[i+1];
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-g") && (i+1 < argc)) {
+            p_group_addr = argv[i+1];
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-t") && (i+1 < argc)) {
+            timeout_in_seconds = atoi(argv[i+1]);
+            i++;
+        }
+        else if (0 == strcmp(argv[i], "-c") && (i+1 < argc)) {
+            counter = atoi(argv[i+1]);
+            i++;
+        }
+        else {
+            usage(argv[0]);
+            return -1;
+        }
+    }
+
+
+    ifm_get_info(if_name, &addr.s_addr, &net.s_addr, NULL);
     ifm_ipaddr(*(unsigned int*)&addr, if_addr_str);
     p_multi_if_addr = if_addr_str;
     
     if (0 == strcmp(argv[1], "join") && argc >= 5) {
-        p_group_addr = argv[3];
-        mc_port = atoi(argv[4]);
-
         /* Resolve the multicast group address */
         hints.ai_family = PF_UNSPEC;
         hints.ai_flags  = AI_NUMERICHOST;
@@ -196,7 +231,7 @@ int main(int argc, char *argv[])
         hints.ai_family   = multicastAddr->ai_family;
         hints.ai_socktype = SOCK_DGRAM;
         hints.ai_flags    = AI_PASSIVE; /* Return an address we can bind to */
-        if ( getaddrinfo(NULL, argv[4], &hints, &localAddr) != 0 ) {
+        if ( getaddrinfo(NULL, mc_port, &hints, &localAddr) != 0 ) {
             fprintf(stderr, "failed to next getaddrinfo()\n");
             return -1;
         }
@@ -222,8 +257,6 @@ int main(int argc, char *argv[])
             ipv6_join_group(fd, multicastAddr);
         }
 
-        if (argc > 5)
-            timeout_in_seconds = atoi(argv[5]);
         usleep(timeout_in_seconds * MICRO);
 
         close_mc_socket(fd);
@@ -231,9 +264,9 @@ int main(int argc, char *argv[])
     }
     else if (0 == strcmp(argv[1], "leave") && argc >= 4) {
         p_group_addr = argv[3];
-        mc_port = atoi(argv[4]);
+        mc_port = argv[4];
 
-        fd = open_mc_socket(mc_port);
+        fd = open_mc_socket(atoi(mc_port));
         if (fd < 0) 
             return -1;
 
@@ -246,12 +279,12 @@ int main(int argc, char *argv[])
         if (counter > 254)
             counter = 254;
         p_group_addr = argv[3];
-        mc_port = atoi(argv[4]);
+        mc_port = argv[4];
 
         p = strrchr(p_group_addr, '.');
         memcpy(tmp_str, p_group_addr, p - p_group_addr);
 
-        fd = open_mc_socket(mc_port);
+        fd = open_mc_socket(atoi(mc_port));
         if (fd < 0) 
             return -1;
 
