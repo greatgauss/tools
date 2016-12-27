@@ -22,7 +22,7 @@ int open_mc_socket(int bind_port)
     int ret;
     struct sockaddr_in bind_addr;
     
-    sock_fd = socket(AF_INET6, SOCK_DGRAM, 0);
+    sock_fd = socket(AF_INET, SOCK_DGRAM, 0);
     if ( sock_fd < 0 ) {
         fprintf(stderr, "create socket failed: %s(%d)\n", strerror(errno),errno);
         return -1;
@@ -30,8 +30,8 @@ int open_mc_socket(int bind_port)
     
     ret = setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&val, sizeof(val));
 
-    /*memset(&bind_addr, 0, sizeof(struct sockaddr_in));
-    bind_addr.sin_family = AF_INET6;
+    memset(&bind_addr, 0, sizeof(struct sockaddr_in));
+    bind_addr.sin_family = AF_INET;
     bind_addr.sin_port = htons(bind_port);
     bind_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     ret = bind(sock_fd, (struct sockaddr *) &bind_addr, sizeof(bind_addr));
@@ -40,7 +40,7 @@ int open_mc_socket(int bind_port)
         close(sock_fd);
         return -1;
     }
-*/
+
     return sock_fd;
 }
 
@@ -143,8 +143,8 @@ static void usage( char * cmd)
     fprintf(stderr, "Join into or leave from a multicast group.\n");
     fprintf(stderr, "usage:\n");
 
-    fprintf(stderr, "%s join -h -i <InterfaceName>  -g <GroupIP> -p <port> -t <exit_in_seconds>\n",cmd);
-    fprintf(stderr, "%s leave -h -i <InterfaceName>  -g <GroupIP> -p <port>\n",cmd);
+    fprintf(stderr, "%s join -h -i <InterfaceName> -g <GroupIP> -p <port> -t <exit_in_seconds>\n",cmd);
+    fprintf(stderr, "%s leave -h -i <InterfaceName> -g <GroupIP> -p <port>\n",cmd);
     fprintf(stderr, "%s joinleave -h -i <InterfaceName>  -g <GroupIP> -p <port> -c <counter>\n",cmd);
     return;
 }
@@ -211,12 +211,11 @@ int main(int argc, char *argv[])
         }
     }
 
-
     ifm_get_info(if_name, &addr.s_addr, &net.s_addr, NULL);
     ifm_ipaddr(*(unsigned int*)&addr, if_addr_str);
     p_multi_if_addr = if_addr_str;
     
-    if (0 == strcmp(argv[1], "join") && argc >= 5) {
+    if (0 == strcmp(argv[1], "join")) {
         /* Resolve the multicast group address */
         hints.ai_family = PF_UNSPEC;
         hints.ai_flags  = AI_NUMERICHOST;
@@ -304,12 +303,7 @@ int main(int argc, char *argv[])
         return 0;
 
     }
-    else {
-        usage(argv[0]);
-        return -1;
-    }
 
     return 0;
 }
-
 
