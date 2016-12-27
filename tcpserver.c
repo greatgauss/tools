@@ -24,19 +24,21 @@ static void usage()
 {
     printf("usage:\n");
     printf("server port:" NEWLINE);
-    printf("\t %d: PING_PONG mode. It is default." NEWLINE, PING_PONG_PORT);
-    printf("\t %d: DATA_FROM_SERVER_TO_CLIENT mode" NEWLINE, DATA_FROM_SERVER_TO_CLIENT_PORT);
+    printf("\t %d: PING_PONG mode by default." NEWLINE, PING_PONG_PORT);
+    printf("\t %d: S ==> C mode" NEWLINE, S_TO_C_PORT);
+    printf("\t %d: C ==> S mode" NEWLINE, C_TO_S_PORT);
     printf("tcpserver -h" NEWLINE);
     printf("tcpserver -s [server_ip] -p [server_port] -l [datalen]" NEWLINE);
 
     return;
 }
 
-int tcp_server_interact_in_ping_pong_mode
+int tcp_server_in_ping_pong_mode
     (int sock_fd, int data_len)
 {
     int ret;
     fd_set rset;
+    int i;
 
     FD_ZERO(&rset);
     FD_SET(sock_fd, &rset);
@@ -71,6 +73,13 @@ readagain:
             printf("the peer has closed the connection\n");
             return -4;
         }
+
+        for (i = 0; i < ret; i++) {
+            if (receiver_buf[i] == '\0')
+               receiver_buf[i] = '\n'; 
+        }
+
+        printf("%s", receiver_buf);
     }
 
 writeagain:
@@ -93,7 +102,7 @@ writeagain:
 
 
 
-int tcp_server_interact_in_pure_sender_mode
+int tcp_server_in_S_TO_C_mode
     (int sock_fd, int data_len)
 {
     int ret;
@@ -130,6 +139,7 @@ writeagain:
     }
     return 0;
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -218,14 +228,14 @@ int main(int argc, char *argv[])
             close(listen_fd);
             if (port == PING_PONG_PORT) {
                 while(1) {
-                    ret = tcp_server_interact_in_ping_pong_mode(conn_fd, data_len);
+                    ret = tcp_server_in_ping_pong_mode(conn_fd, data_len);
                     if(ret != 0)
                         break;
                 }
             }
-            else if (port == DATA_FROM_SERVER_TO_CLIENT_PORT) {
+            else if (port == S_TO_C_PORT) {
                 while(1) {
-                    ret = tcp_server_interact_in_pure_sender_mode(conn_fd, data_len);
+                    ret = tcp_server_in_S_TO_C_mode(conn_fd, data_len);
                     if(ret != 0)
                         break;
                 }
