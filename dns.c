@@ -10,7 +10,6 @@
 
 static void usage()
 {
-    printf("usage:\n");
     printf("dns [name]\n");
     printf("dns -r [ipaddr]\n");
     printf("EXAMPLES:\n");
