@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    bzero(&sin, sizeof(sin));
+    memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
     //sin.sin_addr.s_addr = INADDR_ANY;
     inet_pton(AF_INET, server_ip, &sin.sin_addr);

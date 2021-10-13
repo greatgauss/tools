@@ -18,7 +18,7 @@ int main(int argc, char *argv[])
 
     int sock;                     /* socket descriptor */
     unsigned char ttl = 5;
-    int flag_on = 1;              /* socket option flag */
+    //int flag_on = 1;              /* socket option flag */
     struct sockaddr_in mc_addr;   /* socket address structure */
     int recv_len;                 /* length of string received */
     struct ip_mreq mc_req;        /* multicast request structure */
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
 
         /* block waiting to receive a packet */
         if ((recv_len = recvfrom(sock, recv_buf, MAX_LEN, 0, 
-        (struct sockaddr*)&from_addr, &from_len)) < 0) {
+        (struct sockaddr*)&from_addr, (socklen_t *)&from_len)) < 0) {
         perror("recvfrom() failed");
         exit(1);
         }

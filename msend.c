@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
 
         /* send string to multicast address */
         if ((sendto(sock, send_str, send_len, 0, 
-                    (struct sockaddr *) &mc_addr, sizeof(mc_addr))) != send_len) {
+                    (struct sockaddr *) &mc_addr, sizeof(mc_addr))) != (ssize_t)send_len) {
             perror("sendto() sent incorrect number of bytes");
             exit(1);
         }

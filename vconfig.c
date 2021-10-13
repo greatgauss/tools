@@ -70,6 +70,7 @@ int hex_to_bytes(char* bytes, int bytes_length, char* hex_str) {
    int hlen;
    int i;
    
+   (void)bytes_length;
    int j = 0;
    char hex[3];
    char* stop; /* not used for any real purpose */

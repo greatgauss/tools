@@ -68,7 +68,7 @@ int MakeSocketBlocking(int s) {
 
 void sigint_handler(int arg)
 {
-    arg =arg;
+    (void)arg;
     printf("IGNORE sigint.\n");
 }
 
@@ -165,7 +165,7 @@ int bind_and_connect(char *server_ip, unsigned short port)
     fd_set wset;
     FD_ZERO(&wset);
 
-    bzero(&pin, sizeof(pin));
+    memset(&pin, 0, sizeof(pin));
     pin.sin_family = AF_INET;
     inet_pton(AF_INET, server_ip, &pin.sin_addr);
     pin.sin_port = htons(port);

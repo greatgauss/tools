@@ -66,9 +66,10 @@ int netutils_is_match_ip_packet
 unsigned short proto, unsigned int sip, unsigned int dip, unsigned short sport, unsigned short dport)
 {
     struct iphdr *ip;
-	int hlen;
+    int hlen;
     unsigned char *tcpudp;
 
+    (void)pktsize;
     packet += 14;  //skip ethernet header
     ip = (struct iphdr *)packet;
 
