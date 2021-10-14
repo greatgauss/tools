@@ -26,19 +26,9 @@
 
 #include <netdb.h>
 
+#include "netutils.h"
 
 #define NOT_UNICAST(e) ((e[0] & 0x01) != 0)
-
-#define GOTO(ret_val, lbl) do {ret = ret_val; goto lbl;} while(0)
-
-#define ERR_GOTO(expression, ret_val, lbl) \
-    do { \
-        if(expression) { \
-            ret = ret_val; \
-            goto lbl;\
-        }\
-    } while(0)
-
 
 static char dump_buf[8192];
 void netutils_dump_data(char *desc, unsigned char *data, int datasize)

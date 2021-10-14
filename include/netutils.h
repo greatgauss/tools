@@ -4,6 +4,25 @@
 #include <arpa/inet.h> //for in_addr_t
 
 
+#define GOTO(ret_val, lbl) do {ret = ret_val; goto lbl;} while(0)
+
+#define ERR_GOTO(expression, ret_val, lbl) \
+    do { \
+        if(expression) { \
+            ret = ret_val; \
+            goto lbl;\
+        }\
+    } while(0)
+
+
+#define ERR_GOTO_WITH_INFO(expression, ret_val, lbl, info) \
+    do { \
+        if(expression) { \
+            ret = ret_val; \
+            printf("%s:%s\n", __FUNCTION__, info);\
+            goto lbl;\
+        }\
+    } while(0)
 int create_raw_socket
 (char const *ifname, unsigned short type, unsigned char *hwaddr);
 
