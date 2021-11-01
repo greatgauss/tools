@@ -84,3 +84,16 @@ LOCAL_MODULE = tcpserver
 LOCAL_MODULE_TAGS := optional 
 include $(BUILD_EXECUTABLE)
 
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := usend.c
+LOCAL_SHARED_LIBRARIES := libc libcutils libnetutils
+LOCAL_MODULE = usend
+LOCAL_MODULE_TAGS := optional
+include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES := urecv.c
+LOCAL_SHARED_LIBRARIES := libc libcutils libnetutils
+LOCAL_MODULE = urecv
+LOCAL_MODULE_TAGS := optional
+include $(BUILD_EXECUTABLE)
