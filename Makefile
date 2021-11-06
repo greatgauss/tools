@@ -1,13 +1,24 @@
 prefix = .
 intermediate = ./intermediate
-bindir = $(prefix)/bin
+#bindir = $(prefix)/bin
+bindir = /mnt/fileroot/kejun.gao/linuxtools/bin
 export bindir
 flags = -g -Wall
 all: dns text2byte \
      rawsend rawrecv \
      igmptools vconfig \
-     usend urecv \
-     tcpclient tcpserver
+     tcpclient tcpserver \
+     usend urecv
+
+print_matrix: print_matrix.c
+	gcc $(flags) print_matrix.c -o $(intermediate)/$@
+
+#httpclient: httpclient.c
+#	gcc $(flags) -L liboping http.c httpclient.c -loping -lm -o $(intermediate)/$@
+
+httpserver: httpserver.c
+	gcc $(flags) http.c httpserver.c -o $(intermediate)/$@
+
 dns: dns.c
 	gcc $(flags) dns.c -o $(intermediate)/$@
 
@@ -37,6 +48,10 @@ usend: usend.c
 
 urecv: urecv.c
 	gcc $(flags) urecv.c lib/netutils.c -Iinclude -o $(intermediate)/$@
+
+msend: msend.c
+	gcc $(flags) msend.c -Iinclude -o $(intermediate)/$@
+
 install:
 	install -m 0755 $(intermediate)/dns  $(bindir)
 	install -m 0755 $(intermediate)/text2byte $(bindir)
@@ -48,6 +63,11 @@ install:
 	install -m 0755 $(intermediate)/tcpserver $(bindir)
 	install -m 0755 $(intermediate)/usend $(bindir)
 	install -m 0755 $(intermediate)/urecv $(bindir)
+	install -m 0755 $(intermediate)/msend $(bindir)
+	#install -m 0755 $(intermediate)/httpclient $(bindir)
+	#install -m 0755 $(intermediate)/httpserver $(bindir)
+	#install -m 0755 $(intermediate)/print_matrix $(bindir)
+
 
 clean:
 	rm -fr $(intermediate)/*

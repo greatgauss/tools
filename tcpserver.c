@@ -24,9 +24,8 @@ static void usage()
 {
     printf("usage:\n");
     printf("server port:" NEWLINE);
-    printf("\t %d: PING_PONG mode by default." NEWLINE, PING_PONG_PORT);
-    printf("\t %d: S ==> C mode" NEWLINE, S_TO_C_PORT);
-    printf("\t %d: C ==> S mode" NEWLINE, C_TO_S_PORT);
+    printf("\t %d: PING_PONG mode by default." NEWLINE, PORT_PING_PONG);
+    printf("\t %d: S ==> C mode" NEWLINE, PORT_DATA_TO_CLIENT);
     printf("tcpserver -h" NEWLINE);
     printf("tcpserver -s [server_ip] -p [server_port] -l [datalen]" NEWLINE);
 
@@ -43,7 +42,7 @@ int tcp_server_in_ping_pong_mode
     FD_ZERO(&rset);
     FD_SET(sock_fd, &rset);
 
-    int res = select(sock_fd + 1, &rset,NULL, NULL, NULL);
+    int res = select(sock_fd + 1, &rset, NULL, NULL, NULL);
     if (res == 0) {
         return -1;
     }
@@ -83,7 +82,7 @@ readagain:
     }
 
 writeagain:
-    ret = write(sock_fd, sender_buf, data_len);
+    ret = write(sock_fd, receiver_buf, ret);
     nwritten += ret;
     printf("write %d bytes, total bytes written: %d\n",ret, nwritten);
 
@@ -101,13 +100,11 @@ writeagain:
 }
 
 
-
 int tcp_server_in_S_TO_C_mode
     (int sock_fd, int data_len)
 {
     int ret;
     fd_set wset;
-
     FD_ZERO(&wset);
     FD_SET(sock_fd, &wset);
 
@@ -137,7 +134,7 @@ writeagain:
             }
         }
     }
-    return 0;
+    return ret;
 }
 
 
@@ -156,7 +153,7 @@ int main(int argc, char *argv[])
     int port;
 
     data_len = 26 * 4;
-    port = PING_PONG_PORT;
+    port = PORT_PING_PONG;
 
     for ( i = 1; i < argc; i++ ) {
         if (0 == strcmp(argv[i], "-h")) {
@@ -181,9 +178,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    for (i = 0; i < DATA_BUF_SIZE; i++) {
-        sender_buf[i] = i % 26 + 'A';
-    }
+    //for (i = 0; i < DATA_BUF_SIZE; i++) {
+    //    sender_buf[i] = i % 26 + 'A';
+    //}
 
     printf("\nFIXME!!! If SIGCHLD not handled, the child will become a zombie after client exit\n");
     signal(SIGCHLD, SIG_IGN);
@@ -193,7 +190,7 @@ int main(int argc, char *argv[])
         perror("call to socket");
         exit(1);
     }
-    
+
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
     //sin.sin_addr.s_addr = INADDR_ANY;
@@ -210,7 +207,7 @@ int main(int argc, char *argv[])
         perror("call to listen");
         exit(1);
     }
-    
+
     printf("Accepting connections on %s:%d...\n", server_ip, port);
 
     while(1) {
@@ -226,22 +223,36 @@ int main(int argc, char *argv[])
         }
         else if (0 == ret) {
             close(listen_fd);
-            if (port == PING_PONG_PORT) {
+            if (port == PORT_PING_PONG) {
                 while(1) {
                     ret = tcp_server_in_ping_pong_mode(conn_fd, data_len);
                     if(ret != 0)
                         break;
                 }
             }
-            else if (port == S_TO_C_PORT) {
+            else if (port == PORT_DATA_TO_CLIENT) {
+                int nsend_old = 0;
+                int nsend = 0;
+
                 while(1) {
+                    #define ONE_MB (1024*1024)
                     ret = tcp_server_in_S_TO_C_mode(conn_fd, data_len);
-                    if(ret != 0)
+                    if(ret < 0)
                         break;
+                    nsend += ret;
+                    if (nsend < ONE_MB) {
+                        if (nsend - nsend_old >= ONE_MB / 10) {
+                            printf("send %f KB\n", nsend / 1024.0f);
+                            nsend_old = nsend;
+                        }
+                    }
+                    if (nsend - nsend_old >= ONE_MB) {
+                        printf("send %f MB\n", nsend / 1024.0f / 1024.0f);
+                        nsend_old = nsend;
+                    }
                 }
             }
-           
-            
+
             printf("close the connection\n");
             close(conn_fd);
             exit(0);

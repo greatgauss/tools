@@ -16,11 +16,10 @@ static void usage()
 {
     printf("usage:\n");
     printf("server port:" NEWLINE);
-    printf("\t %d: PING_PONG mode by default." NEWLINE, PING_PONG_PORT);
-    printf("\t %d: S ==> C mode" NEWLINE, S_TO_C_PORT);
-    printf("\t %d: C ==> S mode" NEWLINE, C_TO_S_PORT);
+    printf("\t %d: PING_PONG mode by default." NEWLINE, PORT_PING_PONG);
+    printf("\t %d: S ==> C mode" NEWLINE, PORT_DATA_TO_CLIENT);
     printf("tcpclient -h" NEWLINE);
-    printf("tcpclient -s [server_ip] -p [server_port] -c [count]" NEWLINE);
+    printf("tcpclient -s [server_ip] -p [server_port] -c [count] --recvbufsize [size]" NEWLINE);
 
     return;
 }
@@ -77,8 +76,7 @@ static char sender_buf[DATA_BUF_SIZE];
 static char receiver_buf[DATA_BUF_SIZE];
 
 
-int tcp_client_in_ping_pong_mode
-    (int sock_fd, int id)
+int tcp_client_in_ping_pong_mode(int sock_fd, int id)
 {
     int nread;
     fd_set rset, wset;
@@ -93,19 +91,33 @@ int tcp_client_in_ping_pong_mode
 
     int res = select(sock_fd + 1, &rset, &wset, NULL, &tv);
     if (res == 0) {
+        printf("select TIMEOUT" NEWLINE);
         return -1;
     }
     else if (res < 0) {
         if (errno == EINTR) {
+            printf("select is interrupted" NEWLINE);
             return -2;
         }
         printf("select failed error %d (%s)" NEWLINE, errno, strerror(errno));
         return -3;
     }
 
-    //printf("select returns %d" NEWLINE, res);
-    //printf("after select, fd is %s readable" NEWLINE, FD_ISSET(sock_fd, &rset) ? "":"NOT");
-    //printf("after select, fd is %s writable" NEWLINE, FD_ISSET(sock_fd, &wset) ? "":"NOT");
+    printf("select %d: fd[%sR,%sW]" NEWLINE, res, FD_ISSET(sock_fd, &rset) ? " ":"!",
+    FD_ISSET(sock_fd, &wset) ? " ":"!");
+
+    if (FD_ISSET(sock_fd, &wset)) {
+        int len = sprintf(sender_buf, "ping-%d#", id);
+        //sender_buf[len] = 0;
+        printf("==>: %s\n", sender_buf);
+        int nwriten = write(sock_fd, sender_buf, strlen(sender_buf));
+        if (nwriten < 0) {
+            printf("write failed error %d (%s)" NEWLINE, errno, strerror(errno));
+            return -1;
+        }
+    }
+
+    sleep(2);
 
     if (FD_ISSET(sock_fd, &rset)) {
         nread = read(sock_fd, receiver_buf, MAXLINE);
@@ -113,19 +125,43 @@ int tcp_client_in_ping_pong_mode
             printf("0 byte read. The peer has closed the connection." NEWLINE);
             return -1;
         }
-        else
-            printf("read %d bytes: \n%s\n",nread, receiver_buf);
-    }
-
-    if (FD_ISSET(sock_fd, &wset)) {
-        sprintf(sender_buf, "PING#%d#", id);
-        int nwriten = write(sock_fd, sender_buf, strlen(sender_buf)+1);
-        if (nwriten < 0) {
-            printf("write failed error %d (%s)" NEWLINE, errno, strerror(errno));
-            return -1;
+        else {
+            receiver_buf[nread] = 0;
+            printf("<==(%d): %s\n",nread, receiver_buf);
         }
     }
 
+    return 0;
+}
+
+
+int set_socket_receive_buffer_size(int sock_fd, int buf_size)
+{
+    int ret;
+    int old_size = 0;
+    int new_size = 0;
+    socklen_t value_len = sizeof(old_size);
+
+    ret = getsockopt(sock_fd, SOL_SOCKET, SO_RCVBUF, (void*)&old_size, &value_len);
+    if (ret < 0) {
+        printf("failed to getsockopt(RECVBUF): %s\n", strerror(errno));
+        return ret;
+    }
+
+    ret = setsockopt(sock_fd, SOL_SOCKET, SO_RCVBUF, (void*)&buf_size, sizeof(buf_size));
+    if (ret < 0) {
+        printf("failed to setsockopt(RECVBUF, %d): %s\n", buf_size, strerror(errno));
+        return ret;
+    }
+
+    value_len = sizeof(old_size);
+    ret = getsockopt(sock_fd, SOL_SOCKET, SO_RCVBUF, (void*)&new_size, &value_len);
+    if (ret < 0) {
+        printf("failed to getsockopt(RECVBUF) after update: %s\n", strerror(errno));
+        return ret;
+    }
+
+    printf("set socket receive buffer: %d ==> %d OK.\n", old_size, new_size);
     return 0;
 }
 
@@ -155,10 +191,9 @@ int tcp_client_in_S_TO_C_mode(int sock_fd)
 }
 
     
-int bind_and_connect(char *server_ip, unsigned short port)
+int bind_and_connect(int sock_fd, char *server_ip, unsigned short port)
 {
     struct sockaddr_in pin;
-    int sock_fd;
     int maxFd;
     int res;
 
@@ -170,8 +205,6 @@ int bind_and_connect(char *server_ip, unsigned short port)
     inet_pton(AF_INET, server_ip, &pin.sin_addr);
     pin.sin_port = htons(port);
     
-    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-
     FD_SET(sock_fd, &wset);
     maxFd = sock_fd;
     res = connect(sock_fd, (void *)&pin, sizeof(pin));
@@ -240,7 +273,8 @@ int main(int argc, char *argv[])
     int i,count = 0xFFFFFFFF;
     int res;
     char server_ip[128];
-    int port = PING_PONG_PORT;
+    int port = PORT_PING_PONG;
+    int recv_buf_size = 0;
 
     if (argc < 3) {
         usage();
@@ -264,25 +298,42 @@ int main(int argc, char *argv[])
             count = atoi(argv[i+1]);
             i++;
         }
+        else if (0 == strcmp(argv[i], "--recvbufsize") && (i+1 < (unsigned)argc)) {
+            recv_buf_size = atoi(argv[i+1]);
+            i++;
+        }
         else {
             usage();
             return -1;
         }
     }
 
+    sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd < 0) {
+        printf("failed to create socket: %s\n", strerror(errno));
+        return -1;
+    }
+    if (recv_buf_size != 0)
+        set_socket_receive_buffer_size(sock_fd, recv_buf_size);
+
     printf("try to connect %s:%d" NEWLINE, server_ip, port);
-    sock_fd = bind_and_connect(server_ip, port);
-    if (port == PING_PONG_PORT) {
+    bind_and_connect(sock_fd, server_ip, port);
+    if (port == PORT_PING_PONG) {
         for (i = 0; i < count; i++) {
-            res = tcp_client_in_ping_pong_mode(sock_fd, i);
+            res = tcp_client_in_ping_pong_mode(sock_fd, i+1);
         }
     }
 
-    if (port == S_TO_C_PORT) {
+    if (port == PORT_DATA_TO_CLIENT) {
+            printf("PORT_DATA_TO_CLIENT count:%d" NEWLINE, count);
+
         if (count == 0) {
-            while (1);
+            while(1);
+            //count = 0xFFFFFFFF;
+            //sleep(120);
         }
-        for (i = 0; i < count; i++) {
+
+        for (i = 0; i < (unsigned)count; i++) {
             res = tcp_client_in_S_TO_C_mode(sock_fd);
             if (res != 0)
                 break;
@@ -292,4 +343,3 @@ int main(int argc, char *argv[])
     close(sock_fd);
     return 0;
 }
-

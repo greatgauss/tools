@@ -4,7 +4,6 @@
 
 #define NEWLINE "\n"
 #define MAXLINE 8000
-#define PING_PONG_PORT 18001
-#define S_TO_C_PORT 19001
-#define C_TO_S_PORT 20001
+#define PORT_PING_PONG 8008
+#define PORT_DATA_TO_CLIENT 9009
 #endif
